@@ -152,6 +152,7 @@ export function App() {
               <input
                 type="number"
                 min={0}
+                step="any"
                 value={form.calories}
                 onChange={(e) => updateField('calories', e.target.value)}
               />
@@ -161,6 +162,7 @@ export function App() {
               <input
                 type="number"
                 min={0}
+                step="any"
                 value={form.protein}
                 onChange={(e) => updateField('protein', e.target.value)}
               />
@@ -170,6 +172,7 @@ export function App() {
               <input
                 type="number"
                 min={0}
+                step="any"
                 value={form.carbs}
                 onChange={(e) => updateField('carbs', e.target.value)}
               />
@@ -179,6 +182,7 @@ export function App() {
               <input
                 type="number"
                 min={0}
+                step="any"
                 value={form.fat}
                 onChange={(e) => updateField('fat', e.target.value)}
               />
