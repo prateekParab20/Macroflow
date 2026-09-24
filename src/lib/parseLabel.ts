@@ -158,30 +158,42 @@ function unitFor(kind: Kind, line = ''): UnitKind {
   return 'g';
 }
 
+function keepAmounts(values: number[], max: number): number[] {
+  return values.filter((value) => Number.isFinite(value) && value >= 0 && value <= max);
+}
+
 function numbersOf(line: string, kind: UnitKind): number[] {
   const normalized = normalizeNumbers(stripPercents(line));
   if (kind === 'kcal') {
     const joined = normalized.replace(/(\d{2,3})\s+0\b/g, '$10');
-    const labeled = [...joined.matchAll(/(\d{1,4}(?:\.\d+)?)\s*kcal\b/gi)]
-      .map((match) => Number(match[1]))
-      .filter((value) => value > 0 && value <= 4000);
+    const labeled = keepAmounts(
+      [...joined.matchAll(/(\d{1,4}(?:\.\d+)?)\s*kcal\b/gi)].map((match) => Number(match[1])),
+      4000,
+    ).filter((value) => value > 0);
     if (labeled.length) return labeled;
     if (/\bkj\b/i.test(joined) && !/kcal|calor/i.test(joined)) return [];
-    return [...joined.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)]
-      .map((match) => Number(match[1]))
-      .filter((value) => value > 0 && value <= 4000);
+    return keepAmounts(
+      [...joined.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)].map((match) => Number(match[1])),
+      4000,
+    ).filter((value) => value > 0);
   }
   if (kind === 'mg') {
-    const withUnit = [...normalized.matchAll(/(\d{1,5}(?:\.\d+)?)\s*mg\b/gi)].map((match) => Number(match[1]));
-    if (withUnit.length) return withUnit;
-    return [...normalized.matchAll(/\b(\d{1,5}(?:\.\d+)?)\b/g)].map((match) => Number(match[1]));
+    const withUnit = [...normalized.matchAll(/(\d+(?:\.\d+)?)\s*mg\b/gi)].map((match) => Number(match[1]));
+    if (withUnit.length) return keepAmounts(withUnit, 15000);
+    return keepAmounts(
+      [...normalized.matchAll(/\b(\d{1,5}(?:\.\d+)?)\b/g)].map((match) => Number(match[1])),
+      15000,
+    );
   }
-  const withUnit = [...normalized.matchAll(/(\d{1,4}(?:\.\d+)?)\s*g\b/gi)].map((match) => Number(match[1]));
-  if (withUnit.length) return withUnit;
-  return [...normalized.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)].map((match) => {
-    const value = Number(match[1]);
-    return value >= 100 && value % 10 === 9 ? Math.floor(value / 10) : value;
-  });
+  const withUnit = [...normalized.matchAll(/(\d+(?:\.\d+)?)\s*g\b/gi)].map((match) => Number(match[1]));
+  if (withUnit.length) return keepAmounts(withUnit, 500);
+  return keepAmounts(
+    [...normalized.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)].map((match) => {
+      const value = Number(match[1]);
+      return value >= 100 && value % 10 === 9 ? Math.floor(value / 10) : value;
+    }),
+    500,
+  );
 }
 
 function pickColumn(values: number[], index: number): number | undefined {
@@ -277,14 +289,14 @@ function inDetachedBlock(lines: string[], index: number): boolean {
 function valueNumbers(line: string): number[] {
   const normalized = normalizeNumbers(stripPercents(line));
   const mg = [...normalized.matchAll(/(\d+(?:\.\d+)?)\s*mg\b/gi)].map((match) => Number(match[1]));
-  if (mg.length) return mg;
+  if (mg.length) return keepAmounts(mg, 15000);
   const grams = [...normalized.matchAll(/(\d+(?:\.\d+)?)\s*g\b/gi)].map((match) => Number(match[1]));
-  if (grams.length) return grams;
+  if (grams.length) return keepAmounts(grams, 500);
   const kcal = [...normalized.matchAll(/(\d+(?:\.\d+)?)\s*kcal\b/gi)].map((match) => Number(match[1]));
-  if (kcal.length) return kcal.filter((value) => value <= 4000);
+  if (kcal.length) return keepAmounts(kcal, 4000);
   const bare = normalized.trim().match(/^(\d+(?:\.\d+)?)(?:\s+(\d+(?:\.\d+)?))?$/);
   if (!bare) return [];
-  return [Number(bare[1]), ...(bare[2] ? [Number(bare[2])] : [])];
+  return keepAmounts([Number(bare[1]), ...(bare[2] ? [Number(bare[2])] : [])], 4000);
 }
 
 function zipDetached(lines: string[], column: number): Partial<Record<Kind, Hit>> {
@@ -429,9 +441,13 @@ export function parseNutritionLabel(raw: string, tokens?: OcrToken[]): ParsedLab
     if (!hits[kind] && detached[kind]) hits[kind] = detached[kind];
   });
 
+  const sawLabel = (kind: Kind) => lines.some((line) => classify(line) === kind);
   const assign = (kind: Kind, key: FieldKey) => {
     const hit = hits[kind];
-    if (!hit) return;
+    if (!hit || !keepAmounts([hit.value], kind === 'calories' ? 4000 : kind === 'sodium' ? 15000 : 500).length) {
+      if (hit || sawLabel(kind)) confidence[key] = 'low';
+      return;
+    }
     parsed[key] = hit.value as never;
     confidence[key] = hit.confidence;
     applyTokenConfidence(confidence, key, hit.value, tokens);

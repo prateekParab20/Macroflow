@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
-import { FoodForm } from '../components/FoodForm';
+import { ScanLabel } from '../components/ScanLabel';
 import { QuantityEditor, type QuantityDraft } from '../components/QuantityEditor';
 import { MacroMeter, ProgressRing, Sheet } from '../components/ui';
 import { addDays, formatLongDate, todayISO } from '../lib/dates';
@@ -112,11 +112,9 @@ export function Today() {
       ) : null}
 
       {creating ? (
-        <FoodForm
-          title="New food"
-          initial={{ source: 'manual', favorite: false }}
-          onCancel={() => setCreating(false)}
-          onSubmit={(draft) => {
+        <ScanLabel
+          onClose={() => setCreating(false)}
+          onSave={(draft) => {
             store.saveFood(draft);
             setCreating(false);
           }}
@@ -232,7 +230,7 @@ function AddFoodSheet({
             {!filtered.length ? <p className="empty-inline">No foods match that search.</p> : null}
           </div>
           <button type="button" className="btn btn-quiet" onClick={onCreate}>
-            Create a new food
+            Add a packaged food
           </button>
         </>
       )}

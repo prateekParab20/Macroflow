@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Camera, Plus, Search, Star } from 'lucide-react';
+import { Plus, ScanBarcode, Search, Star } from 'lucide-react';
 import { FoodForm } from '../components/FoodForm';
 import { ScanLabel } from '../components/ScanLabel';
 import { ConfirmDialog, Sheet } from '../components/ui';
@@ -74,12 +74,13 @@ export function Foods() {
               className="choice"
               onClick={() => {
                 setAdding(false);
-                setEditing('new');
+                setScanning(true);
               }}
             >
+              <ScanBarcode size={18} />
               <span className="choice-copy">
-                <strong>Enter manually</strong>
-                <small>Type the numbers from the label.</small>
+                <strong>Look up barcode</strong>
+                <small>Scan or type the package barcode, then confirm.</small>
               </span>
             </button>
             <button
@@ -87,13 +88,12 @@ export function Foods() {
               className="choice"
               onClick={() => {
                 setAdding(false);
-                setScanning(true);
+                setEditing('new');
               }}
             >
-              <Camera size={18} />
               <span className="choice-copy">
-                <strong>Scan label</strong>
-                <small>Photo or upload, then confirm.</small>
+                <strong>Enter manually</strong>
+                <small>Type the numbers from the label.</small>
               </span>
             </button>
           </div>

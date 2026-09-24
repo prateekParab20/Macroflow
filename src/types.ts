@@ -33,7 +33,7 @@ export interface Food {
   sodium?: number;
   favorite: boolean;
   createdAt: string;
-  source: 'seed' | 'manual' | 'scan';
+  source: 'seed' | 'manual' | 'scan' | 'barcode';
   /** What the stored macros describe. */
   basis?: NutritionBasis;
   basisAmount?: number;

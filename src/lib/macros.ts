@@ -105,6 +105,39 @@ export function macroMismatch(calories: number, protein: number, carbs: number, 
   return null;
 }
 
+const CALORIE_FIELD_MAX = 5000;
+const MACRO_FIELD_MAX = 500;
+
+function plausibleAmount(value: number, max: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= max;
+}
+
+/**
+ * Compare the numbers currently typed in the confirm form.
+ * Blank fields are skipped — they are not treated as zero — and values that
+ * cannot be a real label (including raw OCR digit runs) never appear in the text.
+ */
+export function calorieWarningText(fields: {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}): string | null {
+  const { calories, protein, carbs, fat } = fields;
+  const implausible =
+    (calories != null && !plausibleAmount(calories, CALORIE_FIELD_MAX)) ||
+    (protein != null && !plausibleAmount(protein, MACRO_FIELD_MAX)) ||
+    (carbs != null && !plausibleAmount(carbs, MACRO_FIELD_MAX)) ||
+    (fat != null && !plausibleAmount(fat, MACRO_FIELD_MAX));
+  if (implausible) {
+    return 'These amounts don’t look like a nutrition label. Check calories, protein, carbs, and fat.';
+  }
+  if (calories == null || protein == null || carbs == null || fat == null) return null;
+  if (macroMismatch(calories, protein, carbs, fat) == null) return null;
+  const implied = Math.round(impliedCalories(protein, carbs, fat));
+  return `Protein, carbs, and fat add up to about ${implied} kcal. The calorie field says ${Math.round(calories)}. Worth a second look — labels round, but a large gap usually means a misread digit.`;
+}
+
 /**
  * Compare the last few weeks of weigh-ins with the goal and nudge calories
  * in 50 kcal steps, capped at ±300. One trend, not a stack of penalties.
