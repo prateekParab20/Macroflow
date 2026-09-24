@@ -1,4 +1,4 @@
-import type { ActivityLevel, Food, Goal, LogEntry, MealPlan, Profile, UnitSystem, WeighIn } from '../types';
+import type { ActivityLevel, Food, Goal, LogEntry, MealPlan, MetricUnit, NutritionBasis, Profile, UnitSystem, WeighIn } from '../types';
 import { createSeedFoods } from './seed';
 
 export const STORAGE_KEY = 'macroflow.v1';
@@ -75,7 +75,16 @@ function asFoods(value: unknown): Food[] {
       source,
     };
     if (typeof item.fiber === 'number') food.fiber = item.fiber;
+    if (typeof item.sugar === 'number') food.sugar = item.sugar;
     if (typeof item.sodium === 'number') food.sodium = item.sodium;
+    if (item.basis === 'serving' || item.basis === 'per100g' || item.basis === 'per100ml') {
+      food.basis = item.basis as NutritionBasis;
+    }
+    if (typeof item.basisAmount === 'number' && item.basisAmount > 0) food.basisAmount = item.basisAmount;
+    if (item.basisUnit === 'g' || item.basisUnit === 'ml') food.basisUnit = item.basisUnit as MetricUnit;
+    if (typeof item.householdUnit === 'string' && item.householdUnit) food.householdUnit = item.householdUnit;
+    if (typeof item.householdCount === 'number' && item.householdCount > 0) food.householdCount = item.householdCount;
+    if (typeof item.householdMetric === 'number' && item.householdMetric > 0) food.householdMetric = item.householdMetric;
     return [food];
   });
 }

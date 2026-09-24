@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { MacroMeter } from '../components/ui';
 import { formatMonthDay, formatWeekday, todayISO } from '../lib/dates';
-import { formatKcal, formatServings, mealLabel } from '../lib/format';
+import { formatKcal, mealLabel } from '../lib/format';
+import { formatLoggedAmount } from '../lib/quantity';
 import { dayTotals, poolDescription } from '../lib/planner';
 import { useStore } from '../state/Store';
 import type { MealSlot } from '../types';
@@ -91,7 +92,7 @@ export function Plan() {
                     <span>
                       <strong>{item.name}</strong>
                       <small>
-                        {formatServings(item.servings)} · {item.servingSize}
+                        {formatLoggedAmount({ servings: item.servings, servingSize: item.servingSize })}
                       </small>
                     </span>
                     <em>{formatKcal(item.calories * item.servings)}</em>

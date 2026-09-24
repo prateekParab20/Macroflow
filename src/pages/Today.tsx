@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Minus, Plus, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
 import { FoodForm } from '../components/FoodForm';
+import { QuantityEditor, type QuantityDraft } from '../components/QuantityEditor';
 import { MacroMeter, ProgressRing, Sheet } from '../components/ui';
 import { addDays, formatLongDate, todayISO } from '../lib/dates';
-import { formatKcal, formatServings, mealLabel } from '../lib/format';
+import { formatGrams, formatKcal, mealLabel } from '../lib/format';
 import { addMacros, emptyTotals, goalLabel } from '../lib/macros';
+import { defaultQuantity, formatLoggedAmount, portionFromFood, quantityFromScale } from '../lib/quantity';
 import { useStore } from '../state/Store';
 import type { Food, LogEntry, MealSlot } from '../types';
 
@@ -73,7 +75,8 @@ export function Today() {
                   <span className="choice-copy">
                     <strong>{entry.name}</strong>
                     <small>
-                      {formatServings(entry.servings)} · {Math.round(entry.protein * entry.servings)}g protein
+                      {formatLoggedAmount(entry, store.foods.find((food) => food.id === entry.foodId))} ·{' '}
+                      {formatGrams(entry.protein * entry.servings)} g protein
                     </small>
                   </span>
                   <span className="kcal">{formatKcal(entry.calories * entry.servings)}</span>
@@ -94,8 +97,15 @@ export function Today() {
           logs={store.logs}
           onClose={() => setAdding(null)}
           onCreate={() => setCreating(true)}
-          onAdd={(food, servings) => {
-            store.addLog({ date, meal: adding, food, servings });
+          onAdd={(food, draft) => {
+            store.addLog({
+              date,
+              meal: adding,
+              food,
+              servings: draft.scale,
+              quantity: draft.amount,
+              quantityUnit: draft.unit,
+            });
             setAdding(null);
           }}
         />
@@ -116,9 +126,10 @@ export function Today() {
       {editing ? (
         <EditLogSheet
           entry={editing}
+          food={store.foods.find((food) => food.id === editing.foodId)}
           onClose={() => setEditing(null)}
-          onSave={(servings) => {
-            store.updateLog(editing.id, servings);
+          onSave={(draft) => {
+            store.updateLog(editing.id, { servings: draft.scale, quantity: draft.amount, quantityUnit: draft.unit });
             setEditing(null);
           }}
           onDelete={() => {
@@ -143,12 +154,12 @@ function AddFoodSheet({
   foods: Food[];
   logs: LogEntry[];
   onClose: () => void;
-  onAdd: (food: Food, servings: number) => void;
+  onAdd: (food: Food, draft: QuantityDraft) => void;
   onCreate: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Food | null>(null);
-  const [servings, setServings] = useState(1);
+  const [draft, setDraft] = useState<QuantityDraft | null>(null);
 
   const recent = useMemo(() => {
     const ids: string[] = [];
@@ -174,20 +185,13 @@ function AddFoodSheet({
           <button type="button" className="text-btn" onClick={() => setPicked(null)}>
             All foods
           </button>
-          <p className="picker-serving">{picked.servingSize}</p>
-          <div className="stepper">
-            <button type="button" aria-label="Fewer servings" onClick={() => setServings((value) => Math.max(0.25, Math.round((value - 0.25) * 4) / 4))}>
-              <Minus size={18} />
-            </button>
-            <strong>{formatServings(servings).replace(' servings', '').replace(' serving', '')}</strong>
-            <button type="button" aria-label="More servings" onClick={() => setServings((value) => Math.min(8, Math.round((value + 0.25) * 4) / 4))}>
-              <Plus size={18} />
-            </button>
-          </div>
-          <p className="picker-macros">
-            {formatKcal(picked.calories * servings)} kcal · {Math.round(picked.protein * servings)}p · {Math.round(picked.carbs * servings)}c · {Math.round(picked.fat * servings)}f
-          </p>
-          <button type="button" className="btn btn-primary" onClick={() => onAdd(picked, servings)}>
+          <QuantityEditor
+            portion={portionFromFood(picked)}
+            base={picked}
+            initial={defaultQuantity(portionFromFood(picked))}
+            onChange={setDraft}
+          />
+          <button type="button" className="btn btn-primary" disabled={!draft} onClick={() => draft && onAdd(picked, draft)}>
             Add to {mealLabel(meal).toLowerCase()}
           </button>
         </div>
@@ -200,7 +204,7 @@ function AddFoodSheet({
           {!query && recent.length ? (
             <div className="chips" aria-label="Recent foods">
               {recent.map((food) => (
-                <button key={food.id} type="button" onClick={() => { setPicked(food); setServings(1); }}>
+                <button key={food.id} type="button" onClick={() => { setPicked(food); setDraft(null); }}>
                   {food.name}
                 </button>
               ))}
@@ -214,7 +218,7 @@ function AddFoodSheet({
                 className="log-row"
                 onClick={() => {
                   setPicked(food);
-                  setServings(1);
+                  setDraft(null);
                 }}
               >
                 <span className="choice-copy">
@@ -238,33 +242,28 @@ function AddFoodSheet({
 
 function EditLogSheet({
   entry,
+  food,
   onClose,
   onSave,
   onDelete,
 }: {
   entry: LogEntry;
+  food?: Food;
   onClose: () => void;
-  onSave: (servings: number) => void;
+  onSave: (draft: QuantityDraft) => void;
   onDelete: () => void;
 }) {
-  const [servings, setServings] = useState(entry.servings);
+  const portion = portionFromFood(food ?? { servingSize: entry.servingSize });
+  const initial =
+    entry.quantity != null && entry.quantityUnit
+      ? { amount: entry.quantity, unit: entry.quantityUnit }
+      : quantityFromScale(portion, entry.servings);
+  const [draft, setDraft] = useState<QuantityDraft | null>(null);
   return (
     <Sheet title={entry.name} onClose={onClose}>
-      <p className="picker-serving">{entry.servingSize}</p>
-      <div className="stepper">
-        <button type="button" aria-label="Fewer servings" onClick={() => setServings((value) => Math.max(0.25, Math.round((value - 0.25) * 4) / 4))}>
-          <Minus size={18} />
-        </button>
-        <strong>{formatServings(servings).replace(' servings', '').replace(' serving', '')}</strong>
-        <button type="button" aria-label="More servings" onClick={() => setServings((value) => Math.min(8, Math.round((value + 0.25) * 4) / 4))}>
-          <Plus size={18} />
-        </button>
-      </div>
-      <p className="picker-macros">
-        {formatKcal(entry.calories * servings)} kcal · {Math.round(entry.protein * servings)}p · {Math.round(entry.carbs * servings)}c · {Math.round(entry.fat * servings)}f
-      </p>
+      <QuantityEditor portion={portion} base={entry} initial={initial} onChange={setDraft} />
       <div className="stack">
-        <button type="button" className="btn btn-primary" onClick={() => onSave(servings)}>
+        <button type="button" className="btn btn-primary" disabled={!draft} onClick={() => draft && onSave(draft)}>
           Save
         </button>
         <button type="button" className="btn btn-quiet danger-text" onClick={onDelete}>

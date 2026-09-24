@@ -20,7 +20,7 @@ npm run preview
 ## What you can do
 
 - **Profile.** Sex, age, height, and weight in metric or imperial. Goal: lose, maintain, or gain. Activity is optional.
-- **Today.** Calories left, plus protein, carbs, and fat against the day’s target. Log breakfast, lunch, dinner, and snacks from the food library.
+- **Today.** Calories left, plus protein, carbs, and fat against the day’s target. Log breakfast, lunch, dinner, and snacks from the food library. Enter the amount you ate in grams, milliliters, or the amount printed on the label (for example `1 bar` or `2/3 cup`). Macros scale from that food’s per-serving or per-100 g baseline.
 - **Foods.** Add a food from the label by hand, or scan a photo. Search, star, edit, and delete. Twelve sample foods are included so a week can be planned before you scan anything.
 - **Scan.** The photo is read in the browser with Tesseract. Every number is shown for confirmation and editing before it is saved. A mismatch between calories and the macros is called out.
 - **Plan.** Shuffle builds a different 7-day plan from foods you log or star (sample foods fill in until then). Log any day into the diary.
@@ -43,7 +43,11 @@ These are estimates, not medical advice. The full disclaimer is in Profile.
 
 ## Scanning labels
 
-Recognition runs locally. The English model and Tesseract core ship with the app, so a scan does not call an external API and does not need a key. Use a clear photo of the nutrition facts panel, then correct anything that looks wrong. Fiber and sodium are optional.
+Recognition runs locally. The English model and Tesseract core ship with the app, so a scan does not call an external API and does not need a key. The photo is deskewed, cropped to the nutrition-facts panel when a border is visible, and read more than once if the first pass misses calories or a macro. Use a clear photo of the nutrition facts panel. Serving size, calories, protein, carbs, and fat are filled in, plus fiber, sugar, and sodium when they are printed. Uncertain rows are marked so you can correct them before saving. Choose whether those numbers are for one serving, 100 g, or 100 ml.
+
+## Logging a quantity
+
+Saved foods keep the label baseline (one serving, or 100 g / 100 ml). When you add a food to a meal, the amount starts at that baseline — for example `170 g` or `1 bar` — and you change it to what you actually ate. There is no servings multiplier. A half portion is `85 g` or `0.5` bars, and the day’s calories and macros update from that.
 
 ## Privacy
 

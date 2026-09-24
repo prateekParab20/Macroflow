@@ -3,6 +3,8 @@ export type Goal = 'lose' | 'maintain' | 'gain';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 export type UnitSystem = 'metric' | 'imperial';
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type NutritionBasis = 'serving' | 'per100g' | 'per100ml';
+export type MetricUnit = 'g' | 'ml';
 
 export interface Profile {
   gender: Gender;
@@ -27,10 +29,19 @@ export interface Food {
   carbs: number;
   fat: number;
   fiber?: number;
+  sugar?: number;
   sodium?: number;
   favorite: boolean;
   createdAt: string;
   source: 'seed' | 'manual' | 'scan';
+  /** What the stored macros describe. */
+  basis?: NutritionBasis;
+  basisAmount?: number;
+  basisUnit?: MetricUnit;
+  householdUnit?: string;
+  householdCount?: number;
+  /** Grams or ml covered by householdCount of householdUnit. */
+  householdMetric?: number;
 }
 
 /** Macros are stored per one serving so edits to the food don't rewrite history. */
@@ -39,7 +50,11 @@ export interface LogEntry {
   date: string;
   meal: MealSlot;
   foodId: string;
+  /** Scale applied to the food's stored macros. */
   servings: number;
+  /** Exact amount the person ate, in quantityUnit. */
+  quantity?: number;
+  quantityUnit?: string;
   name: string;
   servingSize: string;
   calories: number;
