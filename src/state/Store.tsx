@@ -11,6 +11,7 @@ import { computeTargets, trendAdjustment } from '../lib/macros';
 import { generateMealPlan } from '../lib/planner';
 import { initialData, loadState, saveState, type AppData } from '../lib/storage';
 import { startOfWeekMonday, todayISO } from '../lib/dates';
+import { loggedQuantity } from '../lib/quantity';
 import type { Food, LogEntry, MacroTargets, MealSlot, Profile, WeighIn } from '../types';
 
 interface Store {
@@ -25,8 +26,15 @@ interface Store {
   saveFood: (food: Omit<Food, 'id' | 'createdAt'> & { id?: string }) => void;
   deleteFood: (id: string) => void;
   toggleFavorite: (id: string) => void;
-  addLog: (input: { date: string; meal: MealSlot; food: Food; servings: number }) => void;
-  updateLog: (id: string, servings: number) => void;
+  addLog: (input: {
+    date: string;
+    meal: MealSlot;
+    food: Food;
+    servings: number;
+    quantity: number;
+    quantityUnit: string;
+  }) => void;
+  updateLog: (id: string, patch: { servings: number; quantity: number; quantityUnit: string }) => void;
   deleteLog: (id: string) => void;
   addWeighIn: (input: { date: string; weightKg: number; note?: string }) => void;
   deleteWeighIn: (id: string) => void;
@@ -105,13 +113,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           foods: current.foods.map((food) => (food.id === id ? { ...food, favorite: !food.favorite } : food)),
         }));
       },
-      addLog: ({ date, meal, food, servings }) => {
+      addLog: ({ date, meal, food, servings, quantity, quantityUnit }) => {
         const entry: LogEntry = {
           id: uid(),
           date,
           meal,
           foodId: food.id,
           servings,
+          quantity,
+          quantityUnit,
           name: food.name,
           servingSize: food.servingSize,
           calories: food.calories,
@@ -121,10 +131,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
         setData((current) => ({ ...current, logs: [...current.logs, entry] }));
       },
-      updateLog: (id, servings) => {
+      updateLog: (id, patch) => {
         setData((current) => ({
           ...current,
-          logs: current.logs.map((entry) => (entry.id === id ? { ...entry, servings } : entry)),
+          logs: current.logs.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
         }));
       },
       deleteLog: (id) => {
@@ -201,12 +211,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             const key = `${meal.meal}:${meal.foodId}`;
             if (existing.has(key)) continue;
             existing.add(key);
+            const food = current.foods.find((item) => item.id === meal.foodId);
+            const logged = loggedQuantity(
+              food ?? { servingSize: meal.servingSize },
+              meal.servings,
+            );
             added.push({
               id: uid(),
               date,
               meal: meal.meal,
               foodId: meal.foodId,
               servings: meal.servings,
+              quantity: logged.quantity,
+              quantityUnit: logged.quantityUnit,
               name: meal.name,
               servingSize: meal.servingSize,
               calories: meal.calories,

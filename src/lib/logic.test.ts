@@ -96,13 +96,20 @@ Protein 3g
 Vitamin D 2mcg
 * Percent Daily Values are based on a 2,000 calorie diet.
 `);
-    expect(parsed.servingSize).toBe('2/3 cup (55g)');
+    expect(parsed.servingSize).toBe('2/3 cup (55 g)');
+    expect(parsed.basis).toBe('serving');
+    expect(parsed.basisAmount).toBe(55);
+    expect(parsed.basisUnit).toBe('g');
+    expect(parsed.householdUnit).toBe('cup');
+    expect(parsed.householdCount).toBeCloseTo(2 / 3);
     expect(parsed.calories).toBe(230);
     expect(parsed.fat).toBe(8);
     expect(parsed.carbs).toBe(37);
     expect(parsed.fiber).toBe(4);
+    expect(parsed.sugar).toBe(12);
     expect(parsed.protein).toBe(3);
     expect(parsed.sodium).toBe(160);
+    expect(parsed.sugar).not.toBe(10);
   });
 
   it('tolerates split lines and OCR typos', () => {
@@ -125,6 +132,118 @@ Protein
     expect(parsed.protein).toBe(8);
     expect(parsed.confidence.protein).toBe('low');
     expect(parsed.confidence.fat).toBe('low');
+  });
+
+  it('reads a fuzzy OCR dump and ignores added sugars', () => {
+    const parsed = parseNutritionLabel(`
+Nutriti0n Facts
+Servlng slze 1 bar (40g)
+Calorles 190
+Total Fat 89 9%
+Saturated Fat 4g
+Sodlum 140mg
+Total Carbohydrate 26g
+Dletary Flber 2g
+Total Sugars 18g
+Includes 17g Added Sugars 34%
+Proteln 3g
+`);
+    expect(parsed.servingSize).toMatch(/1 bar/);
+    expect(parsed.householdUnit).toBe('bar');
+    expect(parsed.basisAmount).toBe(40);
+    expect(parsed.calories).toBe(190);
+    expect(parsed.fat).toBe(8);
+    expect(parsed.sodium).toBe(140);
+    expect(parsed.carbs).toBe(26);
+    expect(parsed.fiber).toBe(2);
+    expect(parsed.sugar).toBe(18);
+    expect(parsed.protein).toBe(3);
+  });
+
+  it('reads per-100g values and prefers kcal over kJ', () => {
+    const parsed = parseNutritionLabel(`
+Nutrition Information
+Per 100g
+Energy 1523kJ / 364kcal
+Fat 1.2g
+of which saturates 0.3g
+Carbohydrate 76g
+of which sugars 4.5g
+Fibre 3.1g
+Protein 10g
+Salt 0.8g
+`);
+    expect(parsed.basis).toBe('per100g');
+    expect(parsed.basisAmount).toBe(100);
+    expect(parsed.calories).toBe(364);
+    expect(parsed.fat).toBe(1.2);
+    expect(parsed.carbs).toBe(76);
+    expect(parsed.sugar).toBe(4.5);
+    expect(parsed.fiber).toBe(3.1);
+    expect(parsed.protein).toBe(10);
+    expect(parsed.sodium).toBe(320);
+    expect(parsed.confidence.sodium).toBe('low');
+  });
+
+  it('keeps the per-serving column when the label also lists per 100 g', () => {
+    const parsed = parseNutritionLabel(`
+Nutrition Facts
+Serving size 1 bar (40g)
+Per serving Per 100g
+Calories 190 475
+Total Fat 7g 18g
+Sodium 140mg 350mg
+Total Carbohydrate 26g 65g
+Dietary Fiber 2g 5g
+Total Sugars 18g 45g
+Protein 3g 8g
+`);
+    expect(parsed.basis).toBe('serving');
+    expect(parsed.basisAmount).toBe(40);
+    expect(parsed.calories).toBe(190);
+    expect(parsed.fat).toBe(7);
+    expect(parsed.sodium).toBe(140);
+    expect(parsed.carbs).toBe(26);
+    expect(parsed.fiber).toBe(2);
+    expect(parsed.sugar).toBe(18);
+    expect(parsed.protein).toBe(3);
+  });
+
+  it('zips nutrient names with a detached column of amounts', () => {
+    const parsed = parseNutritionLabel(`
+Nutrition Facts
+Serving size 1 cup (240ml)
+Amount per serving
+Calories
+230
+Total Fat
+Saturated Fat
+Trans Fat
+Cholesterol
+Sodium
+Total Carbohydrate
+Dietary Fiber
+Total Sugars
+Protein
+8g
+1g
+0g
+0mg
+160mg
+37g
+4g
+12g
+3g
+`);
+    expect(parsed.calories).toBe(230);
+    expect(parsed.fat).toBe(8);
+    expect(parsed.sodium).toBe(160);
+    expect(parsed.carbs).toBe(37);
+    expect(parsed.fiber).toBe(4);
+    expect(parsed.sugar).toBe(12);
+    expect(parsed.protein).toBe(3);
+    expect(parsed.basisUnit).toBe('ml');
+    expect(parsed.basisAmount).toBe(240);
   });
 });
 

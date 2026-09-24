@@ -304,6 +304,7 @@ button:disabled { cursor: default; }
   color: var(--orange);
   letter-spacing: 0.02em;
 }
+.field.check { box-shadow: inset 3px 0 0 var(--orange); }
 .field-caption { font-size: 13px; color: var(--secondary); margin-left: 16px; }
 
 .segmented {
@@ -447,6 +448,59 @@ button:disabled { cursor: default; }
 .sheet-group { margin-bottom: 12px; }
 .picker-serving, .picker-macros { text-align: center; color: var(--secondary); margin: 4px 0 8px; }
 .picker-macros { color: var(--label); font-weight: 600; }
+.quantity-block {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 16px 16px 12px;
+  margin: 4px 0 12px;
+}
+.quantity-block .eyebrow { text-align: center; }
+.quantity-row { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+.quantity-row input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  min-width: 0;
+}
+.quantity-unit { color: var(--secondary); font-size: 22px; font-weight: 600; }
+.quantity-units { margin-top: 4px; }
+.quantity-basis { margin: 8px 0 0; text-align: center; color: var(--secondary); font-size: 13px; }
+.basis-segment { margin-top: 12px; }
+.camera-wrap { text-align: center; }
+.camera-stage {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 3 / 4;
+}
+.camera-stage video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.camera-guide {
+  position: absolute;
+  inset: 8% 7%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.shutter {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 4px solid var(--label);
+  background: transparent;
+  margin: 16px auto 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.shutter i { width: 52px; height: 52px; border-radius: 50%; background: var(--label); display: block; }
 .stepper { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 8px 0 4px; }
 .stepper button {
   width: 44px;
