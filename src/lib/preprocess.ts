@@ -100,16 +100,17 @@ function deskewCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   if (!context) return source;
   context.fillStyle = '#ffffff';
   context.fillRect(0, 0, width, height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
   context.translate(width / 2, height / 2);
+  // bestAngle is the clockwise rotation that makes label rules horizontal.
   context.rotate(radians);
   context.drawImage(source, -source.width / 2, -source.height / 2);
   return canvas;
 }
 
 function bestAngle(gray: Float32Array, width: number, height: number): number {
-  const threshold = otsu(gray);
-  const binary = new Uint8Array(gray.length);
-  for (let i = 0; i < gray.length; i += 1) binary[i] = gray[i] < threshold ? 1 : 0;
+  const binary = inkBinary(gray);
   const base = projectionScore(binary, width, height, 0);
   let best = 0;
   let bestScore = base;
@@ -121,8 +122,14 @@ function bestAngle(gray: Float32Array, width: number, height: number): number {
       best = angle;
     }
   }
-  if (bestScore < base * 1.08) return 0;
+  if (Math.abs(best) < 0.4 || bestScore <= base * 1.01) return 0;
   return best;
+}
+
+function inkBinary(gray: Float32Array, cutoff = Math.min(otsu(gray), 105)): Uint8Array {
+  const binary = new Uint8Array(gray.length);
+  for (let i = 0; i < gray.length; i += 1) binary[i] = gray[i] <= cutoff ? 1 : 0;
+  return binary;
 }
 
 function projectionScore(binary: Uint8Array, width: number, height: number, angle: number): number {
@@ -159,7 +166,7 @@ function projectionScore(binary: Uint8Array, width: number, height: number, angl
 
 function cropToLabel(source: HTMLCanvasElement): HTMLCanvasElement {
   const gray = canvasGray(source);
-  const sample = downscale(gray, source.width, source.height, 780);
+  const sample = downscale(gray, source.width, source.height, 780, true);
   const rect = findLabelRect(sample.gray, sample.width, sample.height) ?? contentBounds(sample.gray, sample.width, sample.height);
   if (!rect) return source;
   const scaleX = source.width / sample.width;
@@ -190,43 +197,90 @@ interface Rect {
   height: number;
 }
 
+interface RuleBand {
+  y0: number;
+  y1: number;
+  x0: number;
+  x1: number;
+}
+
 function findLabelRect(gray: Float32Array, width: number, height: number): Rect | null {
-  const threshold = otsu(gray);
-  const dark = new Uint8Array(gray.length);
-  for (let i = 0; i < gray.length; i += 1) dark[i] = gray[i] < threshold ? 1 : 0;
-  const minRunX = Math.max(28, Math.round(width * 0.18));
-  const minRunY = Math.max(28, Math.round(height * 0.16));
-  const rows: number[] = [];
-  const cols: number[] = [];
-  for (let y = 0; y < height; y += 1) if (longestRowRun(dark, y, width) >= minRunX) rows.push(y);
-  for (let x = 0; x < width; x += 1) if (longestColRun(dark, x, width, height) >= minRunY) cols.push(x);
-  const rowBands = cluster(rows, 4);
-  const colBands = cluster(cols, 4);
-  let best: { rect: Rect; score: number } | null = null;
-  for (let topIndex = 0; topIndex < rowBands.length; topIndex += 1) {
-    for (let bottomIndex = topIndex + 1; bottomIndex < rowBands.length; bottomIndex += 1) {
-      const y = rowBands[topIndex];
-      const bottom = rowBands[bottomIndex];
-      const rectHeight = bottom - y;
-      if (rectHeight < height * 0.18 || rectHeight > height * 0.98) continue;
-      for (let leftIndex = 0; leftIndex < colBands.length; leftIndex += 1) {
-        for (let rightIndex = leftIndex + 1; rightIndex < colBands.length; rightIndex += 1) {
-          const x = colBands[leftIndex];
-          const right = colBands[rightIndex];
-          const rectWidth = right - x;
-          if (rectWidth < width * 0.16 || rectWidth > width * 0.98) continue;
-          const aspect = rectHeight / rectWidth;
-          if (aspect < 0.45 || aspect > 3.6) continue;
-          const interior = interiorStats(gray, dark, width, x, y, right, bottom);
-          if (!interior || interior.mean < 145 || interior.darkFraction < 0.015 || interior.darkFraction > 0.42) continue;
-          const area = (rectWidth * rectHeight) / (width * height);
-          const score = area * (0.35 + interior.darkFraction * 2);
-          if (!best || score > best.score) best = { rect: { x, y, width: rectWidth, height: rectHeight }, score };
-        }
-      }
-    }
+  let best: { score: number; rect: Rect } | null = null;
+  for (let cutoff = 136; cutoff <= 172; cutoff += 6) {
+    const found = labelRectAt(gray, width, height, cutoff);
+    if (found && (!best || found.score > best.score)) best = found;
   }
   return best?.rect ?? null;
+}
+
+function labelRectAt(
+  gray: Float32Array,
+  width: number,
+  height: number,
+  cutoff: number,
+): { score: number; rect: Rect } | null {
+  const dark = inkBinary(gray, cutoff);
+  const minWidth = Math.max(40, Math.round(width * 0.18));
+  const bands: RuleBand[] = [];
+  for (let y = 0; y < height; y += 1) {
+    const span = longestSpan(dark, width, height, y, false, 3);
+    if (span.length < minWidth) continue;
+    let ink = 0;
+    const offset = y * width;
+    for (let x = span.start; x < span.end; x += 1) ink += dark[offset + x];
+    if (ink / (span.end - span.start) < 0.55) continue;
+    const band = bands[bands.length - 1];
+    if (
+      band &&
+      y - band.y1 <= 4 &&
+      Math.abs(span.start - band.x0) <= 14 &&
+      Math.abs(span.end - band.x1) <= 14
+    ) {
+      band.y1 = y;
+      band.x0 = Math.min(band.x0, span.start);
+      band.x1 = Math.max(band.x1, span.end);
+    } else {
+      bands.push({ y0: y, y1: y, x0: span.start, x1: span.end });
+    }
+  }
+  if (bands.length < 3) return null;
+
+  const tolerance = Math.max(8, Math.round(width * 0.05));
+  const clusters: RuleBand[][] = [];
+  for (const band of bands) {
+    let placed = false;
+    for (const cluster of clusters) {
+      const x0 = median(cluster.map((item) => item.x0));
+      const x1 = median(cluster.map((item) => item.x1));
+      if (Math.abs(band.x0 - x0) <= tolerance && Math.abs(band.x1 - x1) <= tolerance) {
+        cluster.push(band);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) clusters.push([band]);
+  }
+
+  const cluster = clusters
+    .filter((group) => group.length >= 3)
+    .sort((a, b) => b.length - a.length)[0];
+  if (!cluster) return null;
+
+  const y0 = Math.min(...cluster.map((band) => band.y0));
+  const y1 = Math.max(...cluster.map((band) => band.y1));
+  const x0 = Math.min(...cluster.map((band) => band.x0));
+  const x1 = Math.max(...cluster.map((band) => band.x1));
+  if (x1 - x0 < minWidth || y1 - y0 < height * 0.12) return null;
+  if (x1 - x0 > width * 0.96 && y1 - y0 > height * 0.96) return null;
+  return {
+    score: cluster.length + (1 - (x1 - x0) / width) * 0.25,
+    rect: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+  };
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor((sorted.length - 1) / 2)] ?? 0;
 }
 
 function contentBounds(gray: Float32Array, width: number, height: number): Rect | null {
@@ -257,73 +311,39 @@ function contentBounds(gray: Float32Array, width: number, height: number): Rect 
   return { x: left, y: top, width: rectWidth, height: rectHeight };
 }
 
-function interiorStats(
-  gray: Float32Array,
+function longestSpan(
   dark: Uint8Array,
   width: number,
-  left: number,
-  top: number,
-  right: number,
-  bottom: number,
-): { mean: number; darkFraction: number } | null {
-  const x0 = Math.min(right - 1, left + 4);
-  const y0 = Math.min(bottom - 1, top + 4);
-  const x1 = Math.max(x0 + 1, right - 4);
-  const y1 = Math.max(y0 + 1, bottom - 4);
-  let sum = 0;
-  let ink = 0;
-  let count = 0;
-  const step = Math.max(1, Math.floor(Math.min(x1 - x0, y1 - y0) / 80));
-  for (let y = y0; y < y1; y += step) {
-    for (let x = x0; x < x1; x += step) {
-      const index = y * width + x;
-      sum += gray[index];
-      ink += dark[index];
-      count += 1;
-    }
-  }
-  if (!count) return null;
-  return { mean: sum / count, darkFraction: ink / count };
-}
-
-function cluster(values: number[], gap: number): number[] {
-  if (!values.length) return [];
-  const bands: number[][] = [[values[0]]];
-  for (let i = 1; i < values.length; i += 1) {
-    const current = bands[bands.length - 1];
-    if (values[i] - current[current.length - 1] <= gap) current.push(values[i]);
-    else bands.push([values[i]]);
-  }
-  return bands.map((band) => band[Math.floor((band.length - 1) / 2)]);
-}
-
-function longestRowRun(dark: Uint8Array, y: number, width: number): number {
-  let best = 0;
+  height: number,
+  index: number,
+  vertical: boolean,
+  gap: number,
+): { start: number; end: number; length: number } {
+  const limit = vertical ? height : width;
+  let bestStart = 0;
+  let bestEnd = 0;
+  let runStart = 0;
   let run = 0;
-  const offset = y * width;
-  for (let x = 0; x < width; x += 1) {
-    if (dark[offset + x]) {
-      run += 1;
-      if (run > best) best = run;
+  let holes = 0;
+  for (let i = 0; i < limit; i += 1) {
+    const pixel = vertical ? dark[i * width + index] : dark[index * width + i];
+    if (pixel) {
+      if (run === 0) runStart = i - holes;
+      run += holes + 1;
+      holes = 0;
+      if (run > bestEnd - bestStart) {
+        bestStart = Math.max(0, runStart);
+        bestEnd = i + 1;
+      }
     } else {
-      run = 0;
+      holes += 1;
+      if (holes > gap) {
+        run = 0;
+        holes = 0;
+      }
     }
   }
-  return best;
-}
-
-function longestColRun(dark: Uint8Array, x: number, width: number, height: number): number {
-  let best = 0;
-  let run = 0;
-  for (let y = 0; y < height; y += 1) {
-    if (dark[y * width + x]) {
-      run += 1;
-      if (run > best) best = run;
-    } else {
-      run = 0;
-    }
-  }
-  return best;
+  return { start: bestStart, end: bestEnd, length: bestEnd - bestStart };
 }
 
 function ensureReadableSize(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -346,6 +366,7 @@ function downscale(
   width: number,
   height: number,
   maxSide: number,
+  darkest = false,
 ): { gray: Float32Array; width: number; height: number } {
   const scale = Math.min(1, maxSide / Math.max(width, height));
   if (scale === 1) return { gray, width, height };
@@ -360,13 +381,16 @@ function downscale(
       const x1 = Math.min(width, Math.max(x0 + 1, Math.floor(((x + 1) * width) / nextWidth)));
       let sum = 0;
       let count = 0;
+      let darkestValue = 255;
       for (let yy = y0; yy < y1; yy += 1) {
         for (let xx = x0; xx < x1; xx += 1) {
-          sum += gray[yy * width + xx];
+          const value = gray[yy * width + xx];
+          sum += value;
           count += 1;
+          if (value < darkestValue) darkestValue = value;
         }
       }
-      out[y * nextWidth + x] = count ? sum / count : gray[y0 * width + x0];
+      out[y * nextWidth + x] = darkest ? darkestValue : count ? sum / count : gray[y0 * width + x0];
     }
   }
   return { gray: out, width: nextWidth, height: nextHeight };

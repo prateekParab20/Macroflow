@@ -161,12 +161,13 @@ function unitFor(kind: Kind, line = ''): UnitKind {
 function numbersOf(line: string, kind: UnitKind): number[] {
   const normalized = normalizeNumbers(stripPercents(line));
   if (kind === 'kcal') {
-    const labeled = [...normalized.matchAll(/(\d{1,4}(?:\.\d+)?)\s*kcal\b/gi)]
+    const joined = normalized.replace(/(\d{2,3})\s+0\b/g, '$10');
+    const labeled = [...joined.matchAll(/(\d{1,4}(?:\.\d+)?)\s*kcal\b/gi)]
       .map((match) => Number(match[1]))
       .filter((value) => value > 0 && value <= 4000);
     if (labeled.length) return labeled;
-    if (/\bkj\b/i.test(normalized) && !/kcal|calor/i.test(normalized)) return [];
-    return [...normalized.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)]
+    if (/\bkj\b/i.test(joined) && !/kcal|calor/i.test(joined)) return [];
+    return [...joined.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)]
       .map((match) => Number(match[1]))
       .filter((value) => value > 0 && value <= 4000);
   }
@@ -177,7 +178,10 @@ function numbersOf(line: string, kind: UnitKind): number[] {
   }
   const withUnit = [...normalized.matchAll(/(\d{1,4}(?:\.\d+)?)\s*g\b/gi)].map((match) => Number(match[1]));
   if (withUnit.length) return withUnit;
-  return [...normalized.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)].map((match) => Number(match[1]));
+  return [...normalized.matchAll(/\b(\d{1,4}(?:\.\d+)?)\b/g)].map((match) => {
+    const value = Number(match[1]);
+    return value >= 100 && value % 10 === 9 ? Math.floor(value / 10) : value;
+  });
 }
 
 function pickColumn(values: number[], index: number): number | undefined {
@@ -321,6 +325,12 @@ function zipDetached(lines: string[], column: number): Partial<Record<Kind, Hit>
   return found;
 }
 
+function repairServingText(value: string): string {
+  return value
+    .replace(/(\d+)\s*\/\s*1([348])\b/g, '$1/$2')
+    .replace(/\((\d+)9\)/g, '($1 g)');
+}
+
 function parseServing(lines: string[]): {
   text?: string;
   confidence?: FieldConfidence;
@@ -341,7 +351,7 @@ function parseServing(lines: string[]): {
         confidence = 'low';
       }
     }
-    value = value.replace(/\s+/g, ' ').slice(0, 48);
+    value = repairServingText(value.replace(/\s+/g, ' ')).slice(0, 48);
     if (!value || /servings?\s+per/i.test(value)) continue;
     const measured = parseMeasure(value);
     return { text: value, confidence, ...measured };
@@ -460,7 +470,11 @@ export function parseNutritionLabel(raw: string, tokens?: OcrToken[]): ParsedLab
     parsed.basisUnit = serving.metricUnit;
   }
 
-  const sawTwoColumns = lines.some((line) => numbersOf(line, 'g').length > 1 || numbersOf(line, 'kcal').length > 1);
+  const sawTwoColumns = lines.some((line) => {
+    const kind = classify(line);
+    if (!kind || kind === 'skip') return false;
+    return numbersOf(line, unitFor(kind, line)).length > 1;
+  });
   if (sawTwoColumns && !columns.explicit) {
     parsed.warnings.push('This label lists two amounts. Confirm these are the per-serving numbers.');
   }

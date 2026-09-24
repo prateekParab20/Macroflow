@@ -337,7 +337,9 @@ export function baselineLabel(portion: Portion, calories: number): string {
 export function portionHint(portion: Portion): string | undefined {
   if (!portion.alternate?.metricEach || !portion.alternate.unit) return undefined;
   const unit = portion.referenceUnit === 'ml' ? 'ml' : 'g';
-  return `1 ${portion.alternate.unit} = ${formatAmount(portion.alternate.metricEach)} ${unit}`;
+  const grams = Math.round(portion.alternate.metricEach * 10) / 10;
+  const printed = Number.isInteger(grams) ? String(grams) : grams.toFixed(1);
+  return `1 ${portion.alternate.unit} = ${printed} ${unit}`;
 }
 
 export function formatAmount(amount: number): string {

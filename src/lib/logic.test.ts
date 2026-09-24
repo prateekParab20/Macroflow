@@ -160,6 +160,33 @@ Proteln 3g
     expect(parsed.protein).toBe(3);
   });
 
+  it('repairs a tilted-photo OCR dump without treating % Daily Value as a second column', () => {
+    const parsed = parseNutritionLabel(`
+Honey Almond Granola
+Nutrition Facts
+8 servings per container
+Serving size 2/13 cup (559)
+Calories 23 0
+Total Fat 89 10%
+Sodium 160mg 7%
+Total Carbohydrate 379 13%
+Dietary Fiber 49 14%
+Total Sugars 129
+Includes 10g Added Sugars 20%
+Protein 3g
+`);
+    expect(parsed.servingSize).toBe('2/3 cup (55 g)');
+    expect(parsed.basisAmount).toBe(55);
+    expect(parsed.calories).toBe(230);
+    expect(parsed.fat).toBe(8);
+    expect(parsed.sodium).toBe(160);
+    expect(parsed.carbs).toBe(37);
+    expect(parsed.fiber).toBe(4);
+    expect(parsed.sugar).toBe(12);
+    expect(parsed.protein).toBe(3);
+    expect(parsed.warnings.join(' ')).not.toMatch(/two amounts/i);
+  });
+
   it('reads per-100g values and prefers kcal over kJ', () => {
     const parsed = parseNutritionLabel(`
 Nutrition Information

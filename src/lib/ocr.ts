@@ -22,6 +22,10 @@ function tokensFrom(words: { text: string; confidence: number }[] | undefined): 
 function isStrong(parsed: ParsedLabel): boolean {
   const core = [parsed.calories, parsed.protein, parsed.carbs, parsed.fat];
   if (core.some((value) => value == null)) return false;
+  if (parsed.calories != null && parsed.protein != null && parsed.carbs != null && parsed.fat != null) {
+    const implied = parsed.protein * 4 + parsed.carbs * 4 + parsed.fat * 9;
+    if (parsed.calories > 0 && Math.abs(implied - parsed.calories) / parsed.calories > 0.35) return false;
+  }
   const highs = (['calories', 'protein', 'carbs', 'fat'] as const).filter((key) => parsed.confidence[key] === 'high').length;
   return highs >= 3 && scoreParsedLabel(parsed) >= 14;
 }
