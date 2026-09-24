@@ -1,6 +1,6 @@
 # MacroFlow
 
-A private, on-device progressive web app for daily macros and a weekly meal plan. It looks at home on a phone: large titles, grouped cards, and a bottom tab bar. There is no account and no server.
+A private progressive web app for daily macros and a weekly meal plan. It looks at home on a phone: large titles, grouped cards, and a bottom tab bar. There is no account. Foods, the diary, and weigh-ins stay on this device. Looking up a package barcode sends only that code to Open Food Facts.
 
 ## Run
 
@@ -21,8 +21,9 @@ npm run preview
 
 - **Profile.** Sex, age, height, and weight in metric or imperial. Goal: lose, maintain, or gain. Activity is optional.
 - **Today.** Calories left, plus protein, carbs, and fat against the day’s target. Log breakfast, lunch, dinner, and snacks from the food library. Enter the amount you ate in grams, milliliters, or the amount printed on the label (for example `1 bar` or `2/3 cup`). Macros scale from that food’s per-serving or per-100 g baseline.
-- **Foods.** Add a food from the label by hand, or scan a photo. Search, star, edit, and delete. Twelve sample foods are included so a week can be planned before you scan anything.
-- **Scan.** The photo is read in the browser with Tesseract. Every number is shown for confirmation and editing before it is saved. A mismatch between calories and the macros is called out.
+- **Foods.** Add a packaged food from its barcode, type a label by hand, or fall back to a photo of the nutrition facts. Search, star, edit, and delete. Twelve sample foods are included so a week can be planned before you add anything.
+- **Barcode.** Type or scan an EAN or UPC. The app asks Open Food Facts for the name and macros, then you confirm the serving and every number before saving. No API key.
+- **Label photo.** A fallback for products the database doesn’t have. The photo is read in the browser with Tesseract. Uncertain rows stay editable, and the calorie check uses only the numbers in the form.
 - **Plan.** Shuffle builds a different 7-day plan from foods you log or star (sample foods fill in until then). Log any day into the diary.
 - **Progress.** Weekly weigh-ins, a simple trend, and a small calorie nudge when that trend and your goal disagree.
 
@@ -41,9 +42,15 @@ After two weigh-ins at least a week apart, the app compares the weekly rate with
 
 These are estimates, not medical advice. The full disclaimer is in Profile.
 
-## Scanning labels
+## Adding a packaged food
 
-Recognition runs locally. The English model and Tesseract core ship with the app, so a scan does not call an external API and does not need a key. The photo is deskewed, cropped to the nutrition-facts panel when a border is visible, and read more than once if the first pass misses calories or a macro. Use a clear photo of the nutrition facts panel. Serving size, calories, protein, carbs, and fat are filled in, plus fiber, sugar, and sodium when they are printed. Uncertain rows are marked so you can correct them before saving. Choose whether those numbers are for one serving, 100 g, or 100 ml.
+The main path is the barcode. Enter the digits under the code, or scan it with the camera. EAN-13, EAN-8, UPC-A, and UPC-E use the browser’s barcode detector when it has one, and a small built-in reader otherwise. The lookup calls `https://world.openfoodfacts.org/api/v2/product/{barcode}.json` directly from the browser. That API responds with `Access-Control-Allow-Origin: *`, so no key and no proxy are required for a normal visit. Browsers won’t let the page set a `User-Agent` header; Open Food Facts still returns the product for this request. If the direct call is blocked, the app retries `GET /api/off/{barcode}` — a small Vercel function in this repo that fetches the same URL with a MacroFlow user agent.
+
+There isn’t a fully free photo API that reads nutrition-facts panels reliably, so a label photo stays a fallback. Recognition runs on the device with the English model shipped in the app. The photo is deskewed, cropped to the nutrition-facts panel when a border is visible, and read more than once if the first pass misses calories or a macro. Amounts that can’t be a real label (long OCR digit runs) are left blank instead of being filled in. Every field, including the highlighted ones, can be edited. The note that compares calories with protein, carbs, and fat is recalculated from those fields only: a blank macro is not treated as zero, and impossible values are not printed back as a huge calorie total.
+
+## Confirming the serving
+
+Saved foods keep the label baseline (one serving, or 100 g / 100 ml). The confirm screen is where that exact quantity is checked — for example `3/4 cup (28 g)` — before the food is saved. When you later add it to a meal, the amount starts at that baseline and you change it to what you actually ate.
 
 ## Logging a quantity
 
@@ -51,4 +58,4 @@ Saved foods keep the label baseline (one serving, or 100 g / 100 ml). When you a
 
 ## Privacy
 
-Profile, foods, meals, plans, and weigh-ins never leave the browser. Reset everything from Profile.
+Profile, foods, meals, plans, and weigh-ins stay in the browser. A barcode lookup sends that code to Open Food Facts and nothing else. Label photos are not uploaded. Reset everything from Profile.

@@ -61,7 +61,10 @@ function asFoods(value: unknown): Food[] {
     if (!isRecord(item)) return [];
     if (typeof item.id !== 'string' || typeof item.name !== 'string') return [];
     if (typeof item.calories !== 'number' || typeof item.protein !== 'number') return [];
-    const source = item.source === 'manual' || item.source === 'scan' || item.source === 'seed' ? item.source : 'manual';
+    const source =
+      item.source === 'manual' || item.source === 'scan' || item.source === 'seed' || item.source === 'barcode'
+        ? item.source
+        : 'manual';
     const food: Food = {
       id: item.id,
       name: item.name,

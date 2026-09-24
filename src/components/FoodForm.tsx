@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { macroMismatch } from '../lib/macros';
+import { calorieWarningText } from '../lib/macros';
 import { measureFromServing, portionFromFood } from '../lib/quantity';
 import type { FieldKey, FieldConfidence } from '../lib/parseLabel';
 import type { Food, NutritionBasis } from '../types';
@@ -104,9 +104,13 @@ export function FoodForm({
     [fields],
   );
 
-  const mismatch =
-    numbers.calories != null ? macroMismatch(numbers.calories, numbers.protein, numbers.carbs, numbers.fat) : null;
-  const canSave = name.trim().length > 0 && numbers.calories != null && numbers.calories >= 0;
+  const warning = calorieWarningText({
+    calories: parseNum(fields.calories),
+    protein: parseNum(fields.protein),
+    carbs: parseNum(fields.carbs),
+    fat: parseNum(fields.fat),
+  });
+  const canSave = name.trim().length > 0 && numbers.calories != null && numbers.calories >= 0 && numbers.calories <= 5000;
   const lowCount = Object.values(confidence ?? {}).filter((value) => value === 'low').length;
   const showMissing = confidence != null;
 
@@ -180,7 +184,7 @@ export function FoodForm({
           </p>
         ) : null}
         <div className="group">
-          <label className={confidence?.name === 'low' ? 'field check' : 'field'}>
+          <label className={confidence?.name === 'low' ? 'field field-uncertain' : 'field'}>
             <span className="label">
               Name
               {confidence?.name === 'low' ? <em className="check-tag">Check</em> : null}
@@ -193,7 +197,7 @@ export function FoodForm({
               enterKeyHint="next"
             />
           </label>
-          <label className={confidence?.servingSize === 'low' ? 'field check' : 'field'}>
+          <label className={confidence?.servingSize === 'low' ? 'field field-uncertain' : 'field'}>
             <span className="label">
               {basis === 'serving' ? 'Serving' : 'Package serving'}
               {basis !== 'serving' ? <small> Optional</small> : null}
@@ -277,12 +281,8 @@ export function FoodForm({
             onChange={(value) => setField('sodium', value)}
           />
         </div>
-        {mismatch != null ? (
-          <p className="footnote warn">
-            Protein, carbs, and fat add up to about {Math.round(numbers.protein * 4 + numbers.carbs * 4 + numbers.fat * 9)}{' '}
-            kcal. The calorie field says {Math.round(numbers.calories ?? 0)}. Worth a second look — labels round, but a
-            large gap usually means a misread digit.
-          </p>
+        {warning ? (
+          <p className="footnote warn">{warning}</p>
         ) : (
           <p className="footnote">Fiber, sugar, and sodium are optional. Leave them blank if the label doesn’t list them.</p>
         )}
@@ -323,7 +323,7 @@ function NumberField({
   missing?: boolean;
   onChange: (value: string) => void;
 }) {
-  const tone = check || missing ? 'field check' : 'field';
+  const tone = check || missing ? 'field field-uncertain' : 'field';
   return (
     <label className={tone}>
       <span className="label">
@@ -333,9 +333,11 @@ function NumberField({
         {!check && missing ? <em className="check-tag">Missing</em> : null}
       </span>
       <input
+        type="text"
         inputMode="decimal"
         value={value}
         placeholder="0"
+        autoComplete="off"
         onChange={(event) => onChange(event.target.value)}
         aria-label={`${label} in ${suffix}`}
       />

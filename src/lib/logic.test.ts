@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addDays } from './dates';
-import { bmrMifflin, computeTargets, trendAdjustment } from './macros';
+import { bmrMifflin, calorieWarningText, computeTargets, trendAdjustment } from './macros';
 import { parseNutritionLabel } from './parseLabel';
 import { dayTotals, generateMealPlan } from './planner';
 import { createSeedFoods } from './seed';
@@ -72,6 +72,25 @@ describe('macros', () => {
       'lose',
     );
     expect(trend.calorieAdjustment).toBeGreaterThan(0);
+  });
+});
+
+describe('calorie warning', () => {
+  it('stays quiet until calories, protein, carbs, and fat are all filled', () => {
+    expect(calorieWarningText({ protein: 13, carbs: 0 })).toBeNull();
+    expect(calorieWarningText({ calories: 100, protein: 13, carbs: 0 })).toBeNull();
+  });
+
+  it('does not print garbled OCR digits', () => {
+    const text = calorieWarningText({ calories: 649491, protein: 13, carbs: 0, fat: 605000201.2 });
+    expect(text).toMatch(/don’t look like a nutrition label/i);
+    expect(text).not.toMatch(/649491|5444981863|605000201/);
+  });
+
+  it('uses the numbers typed in the form when they are plausible', () => {
+    const text = calorieWarningText({ calories: 100, protein: 30, carbs: 40, fat: 20 });
+    expect(text).toMatch(/460 kcal/);
+    expect(text).toMatch(/says 100/);
   });
 });
 
@@ -271,6 +290,24 @@ Protein
     expect(parsed.protein).toBe(3);
     expect(parsed.basisUnit).toBe('ml');
     expect(parsed.basisAmount).toBe(240);
+  });
+
+  it('drops impossible OCR digit runs and keeps the nutrients that parsed', () => {
+    const parsed = parseNutritionLabel(`
+Nutrition Facts
+Calories 649491
+Total Fat 605000201g
+Sodium 390mg
+Total Carbohydrate 0g
+Protein 13g
+`);
+    expect(parsed.protein).toBe(13);
+    expect(parsed.carbs).toBe(0);
+    expect(parsed.sodium).toBe(390);
+    expect(parsed.calories).toBeUndefined();
+    expect(parsed.fat).toBeUndefined();
+    expect(parsed.confidence.calories).toBe('low');
+    expect(parsed.confidence.fat).toBe('low');
   });
 });
 

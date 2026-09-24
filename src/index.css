@@ -277,22 +277,29 @@ button:disabled { cursor: default; }
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   min-height: 48px;
   padding: 8px 16px;
   border-bottom: 0.5px solid var(--separator);
   background: var(--card);
 }
 .field:last-child { border-bottom: 0; }
-.field .label { display: flex; align-items: center; gap: 6px; font-size: 17px; }
+.field .label { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; font-size: 17px; }
 .field .label small { color: var(--secondary); font-size: 13px; }
 .field input, .field select {
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 7rem;
+  min-width: 7rem;
   border: 0;
   background: transparent;
   text-align: right;
   font-size: 17px;
+  color: var(--label);
   outline: none;
+}
+.field input.barcode-input {
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
 }
 .field select { appearance: none; color: var(--blue); }
 .gender-field .segmented { flex: 1; max-width: 230px; margin-left: auto; }
@@ -304,7 +311,7 @@ button:disabled { cursor: default; }
   color: var(--orange);
   letter-spacing: 0.02em;
 }
-.field.check { box-shadow: inset 3px 0 0 var(--orange); }
+.field-uncertain { box-shadow: inset 3px 0 0 var(--orange); }
 .field-caption { font-size: 13px; color: var(--secondary); margin-left: 16px; }
 
 .segmented {
@@ -481,6 +488,7 @@ button:disabled { cursor: default; }
   aspect-ratio: 3 / 4;
 }
 .camera-stage video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.barcode-stage video { object-fit: contain; background: #111; }
 .camera-guide {
   position: absolute;
   inset: 8% 7%;
@@ -620,6 +628,10 @@ button:disabled { cursor: default; }
 .banner-warn { background: var(--warn-bg); color: var(--label); }
 .scan-hero h3 { margin: 12px 0 6px; font-size: 28px; letter-spacing: -0.03em; }
 .scan-hero p { margin: 0 0 18px; color: var(--secondary); }
+.barcode-actions { margin-top: 12px; }
+.scan-secondary { margin-top: 28px; }
+.scan-secondary h3 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.02em; }
+.barcode-guide { inset: 38% 8%; border-radius: 8px; }
 .tips { margin: 18px 4px 0; padding: 0 0 0 18px; color: var(--secondary); font-size: 15px; }
 .tips li { margin: 6px 0; }
 .reading { text-align: center; padding-top: 12px; }
