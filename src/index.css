@@ -227,6 +227,7 @@ button:disabled { cursor: default; }
   margin: 0;
 }
 .section-label { display: block; font-size: 13px; font-weight: 600; color: var(--secondary); text-transform: none; margin: 22px 16px 8px; }
+.sheet-label { margin: 8px 4px; }
 .section-head span { color: var(--secondary); font-size: 13px; font-weight: 600; }
 .section-head.in-card { margin: 0 0 4px; }
 .section-head.in-card h2 { font-size: 22px; }
@@ -539,6 +540,9 @@ button:disabled { cursor: default; }
   padding: 8px 12px;
   white-space: nowrap;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .empty-inline { margin: 0; padding: 16px; color: var(--secondary); font-size: 15px; }
 .empty { text-align: center; padding: 28px 12px; color: var(--secondary); }
