@@ -72,7 +72,10 @@ export function Today() {
               {rows.map((entry) => (
                 <button key={entry.id} type="button" className="log-row" onClick={() => setEditing(entry)}>
                   <span className="choice-copy">
-                    <strong>{entry.name}</strong>
+                    <span className="name-line">
+                      <strong>{entry.name}</strong>
+                      {store.recipes.some((recipe) => recipe.id === entry.foodId) ? <em className="tag">Recipe</em> : null}
+                    </span>
                     <small>
                       {formatLoggedAmount(entry, store.foods.find((food) => food.id === entry.foodId))} ·{' '}
                       {formatGrams(entry.protein * entry.servings)} g protein
@@ -93,6 +96,7 @@ export function Today() {
         <AddFood
           meal={adding}
           foods={store.foods}
+          recipes={store.recipes}
           logs={store.logs}
           onClose={() => setAdding(null)}
           onSaveFood={(draft) => store.saveFood(draft)}

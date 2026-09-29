@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Camera, PenLine, ScanBarcode, Search, Star } from 'lucide-react';
+import { Camera, PenLine, ScanBarcode } from 'lucide-react';
 import { mealLabel } from '../lib/format';
 import { defaultQuantity, portionFromFood } from '../lib/quantity';
-import type { Food, LogEntry, MealSlot } from '../types';
+import { foodFromRecipe, sumMacros } from '../lib/recipe';
+import type { Food, LogEntry, MealSlot, Recipe } from '../types';
 import { FoodForm, type FoodDraft } from './FoodForm';
+import { FoodLibrary, type LibraryItem } from './FoodLibrary';
 import { QuantityEditor, type QuantityDraft } from './QuantityEditor';
 import { ScanLabel } from './ScanLabel';
 import { Sheet } from './ui';
@@ -11,6 +13,7 @@ import { Sheet } from './ui';
 export function AddFood({
   meal,
   foods,
+  recipes,
   logs,
   onClose,
   onSaveFood,
@@ -18,6 +21,7 @@ export function AddFood({
 }: {
   meal?: MealSlot;
   foods?: Food[];
+  recipes?: Recipe[];
   logs?: LogEntry[];
   onClose: () => void;
   onSaveFood: (draft: FoodDraft) => Food;
@@ -30,6 +34,8 @@ export function AddFood({
   const library = meal && foods ? foods : null;
   const busy = mode !== null || pending !== null;
 
+  const recipeList = library ? recipes ?? [] : [];
+
   const recent = useMemo(() => {
     if (!library || !logs) return [];
     const ids: string[] = [];
@@ -38,16 +44,32 @@ export function AddFood({
       if (!ids.includes(id)) ids.push(id);
       if (ids.length === 8) break;
     }
-    return ids.map((id) => library.find((food) => food.id === id)).filter((food): food is Food => !!food);
-  }, [library, logs]);
+    const found: ({ kind: 'food'; food: Food } | { kind: 'recipe'; recipe: Recipe })[] = [];
+    for (const id of ids) {
+      const food = library.find((item) => item.id === id);
+      if (food) {
+        found.push({ kind: 'food', food });
+        continue;
+      }
+      const recipe = recipeList.find((item) => item.id === id);
+      if (recipe) found.push({ kind: 'recipe', recipe });
+    }
+    return found;
+  }, [library, logs, recipeList]);
 
-  const filtered = useMemo(() => {
+  const rows = useMemo(() => {
     if (!library) return [];
     const q = query.trim().toLowerCase();
-    return [...library]
+    const foodRows = library
       .filter((food) => !q || food.name.toLowerCase().includes(q))
-      .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name));
-  }, [library, query]);
+      .map((food) => ({ kind: 'food' as const, id: food.id, name: food.name, favorite: food.favorite, food }));
+    const recipeRows = recipeList
+      .filter((recipe) => !q || recipe.name.toLowerCase().includes(q))
+      .map((recipe) => ({ kind: 'recipe' as const, id: recipe.id, name: recipe.name, favorite: false, recipe }));
+    return [...foodRows, ...recipeRows].sort(
+      (a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name),
+    );
+  }, [library, query, recipeList]);
 
   function blurField() {
     const active = document.activeElement;
@@ -64,6 +86,46 @@ export function AddFood({
     setQuantity(null);
     setPending(food);
   }
+
+  function pickRecipe(recipe: Recipe) {
+    pick(foodFromRecipe(recipe));
+  }
+
+  const libraryItems: LibraryItem[] = rows.map((row) =>
+    row.kind === 'food'
+      ? {
+          id: row.food.id,
+          name: row.food.name,
+          subtitle: `${row.food.servingSize} · ${Math.round(row.food.calories)} kcal`,
+          favorite: row.food.favorite,
+          onPick: () => pick(row.food),
+        }
+      : {
+          id: row.recipe.id,
+          name: row.recipe.name,
+          subtitle: `${row.recipe.cookedGrams.toLocaleString()} g cooked · ${Math.round(sumMacros(row.recipe.ingredients).calories)} kcal`,
+          tag: 'Recipe',
+          onPick: () => pickRecipe(row.recipe),
+        },
+  );
+  const recentItems: LibraryItem[] = recent.map((item) =>
+    item.kind === 'food'
+      ? {
+          id: item.food.id,
+          name: item.food.name,
+          subtitle: item.food.servingSize,
+          favorite: item.food.favorite,
+          onPick: () => pick(item.food),
+        }
+      : {
+          id: item.recipe.id,
+          name: item.recipe.name,
+          subtitle: `${item.recipe.cookedGrams} g cooked`,
+          tag: 'Recipe',
+          onPick: () => pickRecipe(item.recipe),
+        },
+  );
+  const pendingIsRecipe = pending != null && recipeList.some((recipe) => recipe.id === pending.id);
 
   function saved(draft: FoodDraft) {
     const food = onSaveFood(draft);
@@ -82,39 +144,14 @@ export function AddFood({
         <Sheet title={library && meal ? mealLabel(meal) : 'Add food'} onClose={onClose}>
           {library ? (
             <>
-              <label className="search">
-                <Search size={16} />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search foods"
-                  autoFocus
-                />
-              </label>
-              {!query && recent.length ? (
-                <div className="chips" aria-label="Recent foods">
-                  {recent.map((food) => (
-                    <button key={food.id} type="button" onClick={() => pick(food)}>
-                      {food.favorite ? <Star size={12} fill="currentColor" aria-hidden="true" /> : null}
-                      {food.name}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <div className="group sheet-group">
-                {filtered.map((food) => (
-                  <button key={food.id} type="button" className="log-row" onClick={() => pick(food)}>
-                    <span className="choice-copy">
-                      <strong>{food.name}</strong>
-                      <small>
-                        {food.servingSize} · {Math.round(food.calories)} kcal
-                      </small>
-                    </span>
-                    {food.favorite ? <Star size={16} className="check-icon" fill="currentColor" aria-hidden="true" /> : null}
-                  </button>
-                ))}
-                {!filtered.length ? <p className="empty-inline">No foods match that search.</p> : null}
-              </div>
+              <FoodLibrary
+                items={libraryItems}
+                recents={recentItems}
+                query={query}
+                onQuery={setQuery}
+                autoFocus
+                emptyLabel="Nothing matches that search."
+              />
               <p className="section-label sheet-label">New food</p>
             </>
           ) : null}
@@ -163,7 +200,9 @@ export function AddFood({
           <QuantityEditor
             portion={portionFromFood(pending)}
             base={pending}
-            initial={defaultQuantity(portionFromFood(pending))}
+            initial={
+              pendingIsRecipe ? { amount: Number.NaN, unit: 'g' } : defaultQuantity(portionFromFood(pending))
+            }
             onChange={setQuantity}
           />
           <button

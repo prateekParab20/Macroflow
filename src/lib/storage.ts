@@ -1,4 +1,4 @@
-import type { ActivityLevel, Food, Goal, LogEntry, MealPlan, MetricUnit, NutritionBasis, Profile, UnitSystem, WeighIn } from '../types';
+import type { ActivityLevel, Food, Goal, LogEntry, MealPlan, MetricUnit, NutritionBasis, Profile, Recipe, RecipeIngredient, UnitSystem, WeighIn } from '../types';
 import { createSeedFoods } from './seed';
 
 export const STORAGE_KEY = 'macroflow.v1';
@@ -10,6 +10,7 @@ export interface AppData {
   logs: LogEntry[];
   weighIns: WeighIn[];
   mealPlan: MealPlan | null;
+  recipes: Recipe[];
 }
 
 export function initialData(): AppData {
@@ -20,6 +21,7 @@ export function initialData(): AppData {
     logs: [],
     weighIns: [],
     mealPlan: null,
+    recipes: [],
   };
 }
 
@@ -92,6 +94,51 @@ function asFoods(value: unknown): Food[] {
   });
 }
 
+function asIngredient(value: unknown): RecipeIngredient | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.id !== 'string' || typeof value.name !== 'string' || !value.name.trim()) return null;
+  if (typeof value.grams !== 'number' || !(value.grams > 0)) return null;
+  if (typeof value.calories !== 'number' || typeof value.protein !== 'number') return null;
+  if (typeof value.carbs !== 'number' || typeof value.fat !== 'number') return null;
+  const ingredient: RecipeIngredient = {
+    id: value.id,
+    name: value.name.trim(),
+    grams: value.grams,
+    calories: value.calories,
+    protein: value.protein,
+    carbs: value.carbs,
+    fat: value.fat,
+  };
+  if (typeof value.foodId === 'string' && value.foodId) ingredient.foodId = value.foodId;
+  return ingredient;
+}
+
+function asRecipes(value: unknown): Recipe[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    if (typeof item.id !== 'string' || typeof item.name !== 'string' || !item.name.trim()) return [];
+    if (typeof item.cookedGrams !== 'number' || !(item.cookedGrams > 0)) return [];
+    if (!Array.isArray(item.ingredients)) return [];
+    const ingredients = item.ingredients.flatMap((entry) => {
+      const ingredient = asIngredient(entry);
+      return ingredient ? [ingredient] : [];
+    });
+    if (!ingredients.length) return [];
+    const recipe: Recipe = {
+      id: item.id,
+      name: item.name.trim(),
+      ingredients,
+      cookedGrams: item.cookedGrams,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date(0).toISOString(),
+      updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : new Date(0).toISOString(),
+    };
+    if (typeof item.tareGrams === 'number' && item.tareGrams >= 0) recipe.tareGrams = item.tareGrams;
+    if (typeof item.grossGrams === 'number' && item.grossGrams > 0) recipe.grossGrams = item.grossGrams;
+    return [recipe];
+  });
+}
+
 export function sanitize(value: unknown): AppData {
   if (!isRecord(value)) return initialData();
   const foods = asFoods(value.foods);
@@ -102,6 +149,7 @@ export function sanitize(value: unknown): AppData {
     logs: Array.isArray(value.logs) ? (value.logs as LogEntry[]) : [],
     weighIns: Array.isArray(value.weighIns) ? (value.weighIns as WeighIn[]) : [],
     mealPlan: isRecord(value.mealPlan) ? (value.mealPlan as unknown as MealPlan) : null,
+    recipes: asRecipes(value.recipes),
   };
 }
 
