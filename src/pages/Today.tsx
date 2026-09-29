@@ -92,6 +92,8 @@ export function Today() {
       {adding ? (
         <AddFood
           meal={adding}
+          foods={store.foods}
+          logs={store.logs}
           onClose={() => setAdding(null)}
           onSaveFood={(draft) => store.saveFood(draft)}
           onLog={(food, draft) => {
