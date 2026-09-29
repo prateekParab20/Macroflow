@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Plus, ScanBarcode, Search, Star } from 'lucide-react';
+import { Plus, Search, Star } from 'lucide-react';
+import { AddFood } from '../components/AddFood';
 import { FoodForm } from '../components/FoodForm';
-import { ScanLabel } from '../components/ScanLabel';
-import { ConfirmDialog, Sheet } from '../components/ui';
+import { ConfirmDialog } from '../components/ui';
 import { useStore } from '../state/Store';
 import type { Food } from '../types';
 
@@ -10,8 +10,7 @@ export function Foods() {
   const { foods, saveFood, deleteFood, toggleFavorite } = useStore();
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<Food | 'new' | null>(null);
-  const [scanning, setScanning] = useState(false);
+  const [editing, setEditing] = useState<Food | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Food | null>(null);
 
   const visible = useMemo(() => {
@@ -66,61 +65,19 @@ export function Foods() {
         {!visible.length ? <p className="empty-inline">No foods match that search.</p> : null}
       </div>
 
-      {adding ? (
-        <Sheet title="Add food" onClose={() => setAdding(false)}>
-          <div className="group sheet-group">
-            <button
-              type="button"
-              className="choice"
-              onClick={() => {
-                setAdding(false);
-                setScanning(true);
-              }}
-            >
-              <ScanBarcode size={18} />
-              <span className="choice-copy">
-                <strong>Look up barcode</strong>
-                <small>Scan or type the package barcode, then confirm.</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="choice"
-              onClick={() => {
-                setAdding(false);
-                setEditing('new');
-              }}
-            >
-              <span className="choice-copy">
-                <strong>Enter manually</strong>
-                <small>Type the numbers from the label.</small>
-              </span>
-            </button>
-          </div>
-        </Sheet>
-      ) : null}
+      {adding ? <AddFood onClose={() => setAdding(false)} onSaveFood={(draft) => saveFood(draft)} /> : null}
 
       {editing ? (
         <FoodForm
-          title={editing === 'new' ? 'New food' : 'Edit food'}
-          initial={editing === 'new' ? { source: 'manual', favorite: false } : editing}
+          title="Edit food"
+          initial={editing}
           onCancel={() => setEditing(null)}
           onSubmit={(draft) => {
             saveFood(draft);
             setEditing(null);
           }}
-          onDelete={editing === 'new' ? undefined : () => setPendingDelete(editing)}
+          onDelete={() => setPendingDelete(editing)}
           submitLabel="Save"
-        />
-      ) : null}
-
-      {scanning ? (
-        <ScanLabel
-          onClose={() => setScanning(false)}
-          onSave={(draft) => {
-            saveFood(draft);
-            setScanning(false);
-          }}
         />
       ) : null}
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { calorieWarningText } from '../lib/macros';
 import { measureFromServing, portionFromFood } from '../lib/quantity';
 import type { FieldKey, FieldConfidence } from '../lib/parseLabel';
+import { useHistoryLayer } from '../lib/useHistoryLayer';
 import type { Food, NutritionBasis } from '../types';
 
 export interface FoodDraft {
@@ -53,6 +54,7 @@ export function FoodForm({
   imageUrl,
   rawText,
   submitLabel = 'Save',
+  trackHistory = true,
   onCancel,
   onSubmit,
   onDelete,
@@ -64,6 +66,7 @@ export function FoodForm({
   imageUrl?: string;
   rawText?: string;
   submitLabel?: string;
+  trackHistory?: boolean;
   onCancel: () => void;
   onSubmit: (draft: FoodDraft) => void;
   onDelete?: () => void;
@@ -90,6 +93,7 @@ export function FoodForm({
     sugar: num(initial.sugar),
     sodium: num(initial.sodium),
   });
+  useHistoryLayer(trackHistory, onCancel);
 
   const numbers = useMemo(
     () => ({

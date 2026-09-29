@@ -1,12 +1,20 @@
 import { useEffect, type ReactNode } from 'react';
+import { fieldFocusedRecently } from '../lib/keyboard';
+import { useHistoryLayer } from '../lib/useHistoryLayer';
+
+let scrollLocks = 0;
 
 export function useBodyLock(locked = true) {
   useEffect(() => {
     if (!locked) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    scrollLocks += 1;
+    document.documentElement.classList.add('scroll-lock');
     return () => {
-      document.body.style.overflow = previous;
+      scrollLocks -= 1;
+      if (scrollLocks <= 0) {
+        scrollLocks = 0;
+        document.documentElement.classList.remove('scroll-lock');
+      }
     };
   }, [locked]);
 }
@@ -90,6 +98,7 @@ export function Sheet({
   trailing?: ReactNode;
 }) {
   useBodyLock();
+  useHistoryLayer(true, onClose);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -99,7 +108,17 @@ export function Sheet({
   }, [onClose]);
 
   return (
-    <div className="overlay" onMouseDown={onClose}>
+    <div
+      className="overlay"
+      onMouseDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        event.preventDefault();
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget || fieldFocusedRecently()) return;
+        onClose();
+      }}
+    >
       <div
         className="sheet"
         role="dialog"
@@ -135,8 +154,19 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   useBodyLock();
+  useHistoryLayer(true, onCancel);
   return (
-    <div className="overlay center confirm-overlay" onMouseDown={onCancel}>
+    <div
+      className="overlay center confirm-overlay"
+      onMouseDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        event.preventDefault();
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        onCancel();
+      }}
+    >
       <div
         className="dialog"
         role="alertdialog"

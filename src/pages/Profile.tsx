@@ -127,15 +127,18 @@ function BodyEditor() {
 
   useEffect(() => {
     if (!profile) return;
-    setAge(String(profile.age));
+    const editing = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.field : undefined;
+    if (editing !== 'age') setAge(String(profile.age));
     if (profile.unitSystem === 'metric') {
-      setHeight(String(Math.round(profile.heightCm)));
+      if (editing !== 'height') setHeight(String(Math.round(profile.heightCm)));
     } else {
       const converted = cmToFeetInches(profile.heightCm);
-      setFeet(String(converted.feet));
-      setInches(String(converted.inches));
+      if (editing !== 'feet') setFeet(String(converted.feet));
+      if (editing !== 'inches') setInches(String(converted.inches));
     }
-    setWeight(profile.unitSystem === 'imperial' ? trim(kgToLb(profile.weightKg), 1) : trim(profile.weightKg, 1));
+    if (editing !== 'weight') {
+      setWeight(profile.unitSystem === 'imperial' ? trim(kgToLb(profile.weightKg), 1) : trim(profile.weightKg, 1));
+    }
   }, [profile]);
 
   if (!profile) return null;
@@ -174,6 +177,14 @@ function BodyEditor() {
       return;
     }
     updateProfile({ heightCm: cm });
+  }
+
+  function commitWhenLeft(field: string, commit: () => void) {
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.dataset.field === field) return;
+      commit();
+    }, 400);
   }
 
   function commitWeight() {
@@ -215,9 +226,10 @@ function BodyEditor() {
           <span className="label">Age</span>
           <input
             inputMode="numeric"
+            data-field="age"
             value={age}
             onChange={(event) => setAge(event.target.value.replace(/\D/g, '').slice(0, 2))}
-            onBlur={commitAge}
+            onBlur={() => commitWhenLeft('age', commitAge)}
           />
         </label>
         {profile.unitSystem === 'metric' ? (
@@ -225,9 +237,10 @@ function BodyEditor() {
             <span className="label">Height</span>
             <input
               inputMode="decimal"
+              data-field="height"
               value={height}
               onChange={(event) => setHeight(event.target.value.replace(/[^0-9.]/g, ''))}
-              onBlur={commitHeight}
+              onBlur={() => commitWhenLeft('height', commitHeight)}
             />
             <em className="suffix">cm</em>
           </label>
@@ -238,9 +251,10 @@ function BodyEditor() {
               <input
                 inputMode="numeric"
                 aria-label="Feet"
+                data-field="feet"
                 value={feet}
                 onChange={(event) => setFeet(event.target.value.replace(/\D/g, '').slice(0, 1))}
-                onBlur={commitHeight}
+                onBlur={() => commitWhenLeft('feet', commitHeight)}
               />
               <em className="suffix">ft</em>
             </label>
@@ -249,9 +263,10 @@ function BodyEditor() {
               <input
                 inputMode="numeric"
                 aria-label="Inches"
+                data-field="inches"
                 value={inches}
                 onChange={(event) => setInches(event.target.value.replace(/\D/g, '').slice(0, 2))}
-                onBlur={commitHeight}
+                onBlur={() => commitWhenLeft('inches', commitHeight)}
               />
               <em className="suffix">in</em>
             </label>
@@ -261,9 +276,10 @@ function BodyEditor() {
           <span className="label">Weight</span>
           <input
             inputMode="decimal"
+            data-field="weight"
             value={weight}
             onChange={(event) => setWeight(event.target.value.replace(/[^0-9.]/g, ''))}
-            onBlur={commitWeight}
+            onBlur={() => commitWhenLeft('weight', commitWeight)}
           />
           <em className="suffix">{profile.unitSystem === 'imperial' ? 'lb' : 'kg'}</em>
         </label>

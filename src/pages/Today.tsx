@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
-import { ScanLabel } from '../components/ScanLabel';
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { AddFood } from '../components/AddFood';
 import { QuantityEditor, type QuantityDraft } from '../components/QuantityEditor';
 import { MacroMeter, ProgressRing, Sheet } from '../components/ui';
 import { addDays, formatLongDate, todayISO } from '../lib/dates';
 import { formatGrams, formatKcal, mealLabel } from '../lib/format';
 import { addMacros, emptyTotals, goalLabel } from '../lib/macros';
-import { defaultQuantity, formatLoggedAmount, portionFromFood, quantityFromScale } from '../lib/quantity';
+import { formatLoggedAmount, portionFromFood, quantityFromScale } from '../lib/quantity';
 import { useStore } from '../state/Store';
 import type { Food, LogEntry, MealSlot } from '../types';
 
@@ -18,7 +18,6 @@ export function Today() {
   const [date, setDate] = useState(today);
   const [adding, setAdding] = useState<MealSlot | null>(null);
   const [editing, setEditing] = useState<LogEntry | null>(null);
-  const [creating, setCreating] = useState(false);
 
   const entries = store.logs.filter((entry) => entry.date === date);
   const totals = entries.reduce((sum, entry) => addMacros(sum, entry, entry.servings), emptyTotals());
@@ -91,13 +90,11 @@ export function Today() {
       })}
 
       {adding ? (
-        <AddFoodSheet
+        <AddFood
           meal={adding}
-          foods={store.foods}
-          logs={store.logs}
           onClose={() => setAdding(null)}
-          onCreate={() => setCreating(true)}
-          onAdd={(food, draft) => {
+          onSaveFood={(draft) => store.saveFood(draft)}
+          onLog={(food, draft) => {
             store.addLog({
               date,
               meal: adding,
@@ -107,16 +104,6 @@ export function Today() {
               quantityUnit: draft.unit,
             });
             setAdding(null);
-          }}
-        />
-      ) : null}
-
-      {creating ? (
-        <ScanLabel
-          onClose={() => setCreating(false)}
-          onSave={(draft) => {
-            store.saveFood(draft);
-            setCreating(false);
           }}
         />
       ) : null}
@@ -137,104 +124,6 @@ export function Today() {
         />
       ) : null}
     </div>
-  );
-}
-
-function AddFoodSheet({
-  meal,
-  foods,
-  logs,
-  onClose,
-  onAdd,
-  onCreate,
-}: {
-  meal: MealSlot;
-  foods: Food[];
-  logs: LogEntry[];
-  onClose: () => void;
-  onAdd: (food: Food, draft: QuantityDraft) => void;
-  onCreate: () => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [picked, setPicked] = useState<Food | null>(null);
-  const [draft, setDraft] = useState<QuantityDraft | null>(null);
-
-  const recent = useMemo(() => {
-    const ids: string[] = [];
-    for (let i = logs.length - 1; i >= 0; i -= 1) {
-      const id = logs[i].foodId;
-      if (!ids.includes(id)) ids.push(id);
-      if (ids.length === 8) break;
-    }
-    return ids.map((id) => foods.find((food) => food.id === id)).filter((food): food is Food => !!food);
-  }, [foods, logs]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return [...foods]
-      .filter((food) => !q || food.name.toLowerCase().includes(q))
-      .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name));
-  }, [foods, query]);
-
-  return (
-    <Sheet title={picked ? picked.name : mealLabel(meal)} onClose={onClose}>
-      {picked ? (
-        <div className="picker-detail">
-          <button type="button" className="text-btn" onClick={() => setPicked(null)}>
-            All foods
-          </button>
-          <QuantityEditor
-            portion={portionFromFood(picked)}
-            base={picked}
-            initial={defaultQuantity(portionFromFood(picked))}
-            onChange={setDraft}
-          />
-          <button type="button" className="btn btn-primary" disabled={!draft} onClick={() => draft && onAdd(picked, draft)}>
-            Add to {mealLabel(meal).toLowerCase()}
-          </button>
-        </div>
-      ) : (
-        <>
-          <label className="search">
-            <Search size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search foods" autoFocus />
-          </label>
-          {!query && recent.length ? (
-            <div className="chips" aria-label="Recent foods">
-              {recent.map((food) => (
-                <button key={food.id} type="button" onClick={() => { setPicked(food); setDraft(null); }}>
-                  {food.name}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <div className="group sheet-group">
-            {filtered.map((food) => (
-              <button
-                key={food.id}
-                type="button"
-                className="log-row"
-                onClick={() => {
-                  setPicked(food);
-                  setDraft(null);
-                }}
-              >
-                <span className="choice-copy">
-                  <strong>{food.name}</strong>
-                  <small>
-                    {food.servingSize} · {Math.round(food.calories)} kcal
-                  </small>
-                </span>
-              </button>
-            ))}
-            {!filtered.length ? <p className="empty-inline">No foods match that search.</p> : null}
-          </div>
-          <button type="button" className="btn btn-quiet" onClick={onCreate}>
-            Add a packaged food
-          </button>
-        </>
-      )}
-    </Sheet>
   );
 }
 
