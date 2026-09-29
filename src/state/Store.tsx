@@ -23,7 +23,7 @@ interface Store {
   targets: MacroTargets | null;
   completeOnboarding: (profile: Profile) => void;
   updateProfile: (patch: Partial<Profile>) => void;
-  saveFood: (food: Omit<Food, 'id' | 'createdAt'> & { id?: string }) => void;
+  saveFood: (food: Omit<Food, 'id' | 'createdAt'> & { id?: string }) => Food;
   deleteFood: (id: string) => void;
   toggleFavorite: (id: string) => void;
   addLog: (input: {
@@ -86,23 +86,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
       saveFood: (food) => {
-        setData((current) => {
-          if (food.id) {
-            return {
-              ...current,
-              foods: current.foods.map((item) =>
-                item.id === food.id ? { ...item, ...food, id: item.id, createdAt: item.createdAt } : item,
-              ),
+        const existing = food.id ? data.foods.find((item) => item.id === food.id) : undefined;
+        const saved: Food = existing
+          ? { ...existing, ...food, id: existing.id, createdAt: existing.createdAt }
+          : {
+              ...food,
+              id: food.id ?? uid(),
+              createdAt: new Date().toISOString(),
+              favorite: food.favorite ?? false,
             };
+        setData((current) => {
+          const match = current.foods.find((item) => item.id === saved.id);
+          if (match) {
+            const next = { ...match, ...saved, id: match.id, createdAt: match.createdAt };
+            return { ...current, foods: current.foods.map((item) => (item.id === saved.id ? next : item)) };
           }
-          const created: Food = {
-            ...food,
-            id: uid(),
-            createdAt: new Date().toISOString(),
-            favorite: food.favorite ?? false,
-          };
-          return { ...current, foods: [created, ...current.foods] };
+          return { ...current, foods: [saved, ...current.foods] };
         });
+        return saved;
       },
       deleteFood: (id) => {
         setData((current) => ({ ...current, foods: current.foods.filter((food) => food.id !== id) }));

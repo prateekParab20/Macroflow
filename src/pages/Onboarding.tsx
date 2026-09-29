@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import { Segmented } from '../components/ui';
+import { HistoryStep } from '../lib/useHistoryLayer';
 import { ACTIVITY, activityLabel, computeTargets, goalLabel } from '../lib/macros';
 import { cmToFeetInches, feetInchesToCm, kgToLb, lbToKg, trim } from '../lib/units';
 import { useStore } from '../state/Store';
@@ -96,6 +97,9 @@ export function Onboarding() {
 
   return (
     <div className="onboard">
+      {Array.from({ length: step }, (_, index) => (
+        <HistoryStep key={index} onBack={() => setStep(index)} />
+      ))}
       <div className="dots" aria-hidden="true">
         {STEPS.map((id, index) => (
           <i key={id} className={index === step ? 'on' : undefined} />
