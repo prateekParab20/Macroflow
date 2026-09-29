@@ -12,11 +12,12 @@ import { generateMealPlan } from '../lib/planner';
 import { initialData, loadState, saveState, type AppData } from '../lib/storage';
 import { startOfWeekMonday, todayISO } from '../lib/dates';
 import { loggedQuantity } from '../lib/quantity';
-import type { Food, LogEntry, MacroTargets, MealSlot, Profile, WeighIn } from '../types';
+import type { Food, LogEntry, MacroTargets, MealSlot, Profile, Recipe, WeighIn } from '../types';
 
 interface Store {
   profile: Profile | null;
   foods: Food[];
+  recipes: Recipe[];
   logs: LogEntry[];
   weighIns: WeighIn[];
   mealPlan: AppData['mealPlan'];
@@ -25,6 +26,8 @@ interface Store {
   updateProfile: (patch: Partial<Profile>) => void;
   saveFood: (food: Omit<Food, 'id' | 'createdAt'> & { id?: string }) => Food;
   deleteFood: (id: string) => void;
+  saveRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Recipe;
+  deleteRecipe: (id: string) => void;
   toggleFavorite: (id: string) => void;
   addLog: (input: {
     date: string;
@@ -58,6 +61,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return {
       profile: data.profile,
       foods: data.foods,
+      recipes: data.recipes,
       logs: data.logs,
       weighIns: data.weighIns,
       mealPlan: data.mealPlan,
@@ -107,6 +111,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       deleteFood: (id) => {
         setData((current) => ({ ...current, foods: current.foods.filter((food) => food.id !== id) }));
+      },
+      saveRecipe: (recipe) => {
+        const existing = recipe.id ? data.recipes.find((item) => item.id === recipe.id) : undefined;
+        const saved: Recipe = {
+          ...recipe,
+          name: recipe.name.trim(),
+          id: existing?.id ?? recipe.id ?? uid(),
+          createdAt: existing?.createdAt ?? new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setData((current) => {
+          const match = current.recipes.find((item) => item.id === saved.id);
+          if (match) {
+            const next = { ...saved, id: match.id, createdAt: match.createdAt };
+            return { ...current, recipes: current.recipes.map((item) => (item.id === saved.id ? next : item)) };
+          }
+          return { ...current, recipes: [saved, ...current.recipes] };
+        });
+        return saved;
+      },
+      deleteRecipe: (id) => {
+        setData((current) => ({ ...current, recipes: current.recipes.filter((recipe) => recipe.id !== id) }));
       },
       toggleFavorite: (id) => {
         setData((current) => ({

@@ -103,6 +103,35 @@ export interface MacroTotals {
   fat: number;
 }
 
+/** One raw ingredient in a home-cooked batch. Macros are for `grams`, snapshotted when added. */
+export interface RecipeIngredient {
+  id: string;
+  name: string;
+  grams: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  foodId?: string;
+}
+
+/**
+ * A pot of food. Logging uses cooked grams, not a serving count.
+ * Past logs copy the macros at log time, so later edits do not rewrite history.
+ */
+export interface Recipe {
+  id: string;
+  name: string;
+  ingredients: RecipeIngredient[];
+  cookedGrams: number;
+  /** Empty-pot weight, when the cooked weight was scale reading minus pot. */
+  tareGrams?: number;
+  /** Scale reading that included the pot. */
+  grossGrams?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MacroTargets extends MacroTotals {
   bmr: number;
   tdee: number;
